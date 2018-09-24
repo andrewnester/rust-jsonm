@@ -1,0 +1,9 @@
+[package]
+name = "jsonm"
+version = "0.1.0"
+authors = ["Andrew Nester <andrew.nester.dev@gmail.com>"]
+
+[dependencies]
+serde_json = "1.0"
+serde = "1.0.79"
+regex = "1"
