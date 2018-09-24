@@ -1,5 +1,7 @@
 # rust-jsonm
 
+[![Build Status](https://travis-ci.org/andrewnester/rust-jsonm.svg?branch=master)](https://travis-ci.org/andrewnester/rust-jsonm)
+
 **jsonm** implementation port for Rust.
 
 Original library written in JS is here: https://github.com/lennartcl/jsonm
