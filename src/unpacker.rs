@@ -28,7 +28,7 @@ pub struct Unpacker {
 
 #[derive(Debug, Clone)]
 pub struct UnpackerError {
-    cause: String,
+    pub cause: String,
 }
 
 impl fmt::Display for UnpackerError {
@@ -57,10 +57,20 @@ impl Unpacker {
         }
     }
 
+    /// Unpack an packed object to its original input.
     pub fn unpack<T>(&mut self, packed_object: &Value) -> Result<T, UnpackerError>
     where
         for<'de> T: Deserialize<'de>,
     {
+        if packed_object.is_null() {
+            return match serde_json::from_value(Value::Null) {
+                Ok(v) => Ok(v),
+                Err(_err) => Err(UnpackerError {
+                    cause: "wrong end type for Value::Null, use Value type instead".to_owned(),
+                }),
+            };
+        };
+
         let packed_arr = match packed_object.as_array() {
             Some(packed_arr) => packed_arr,
             None => {
@@ -111,6 +121,26 @@ impl Unpacker {
         Ok(result)
     }
 
+    /// Unpack an object to a string.
+    pub fn unpack_string(&mut self, packed_object: &Value) -> Result<String, UnpackerError> {
+        match packed_object.as_array() {
+            Some(arr) => {
+                if arr[0] == TYPE_STRING {
+                    return self.unpack(packed_object);
+                }
+
+                match self.unpack::<Value>(packed_object) {
+                    Ok(s) => Ok(s.to_string()),
+                    Err(err) => Err(err),
+                }
+            }
+            None => match self.unpack::<Value>(packed_object) {
+                Ok(s) => Ok(s.to_string()),
+                Err(err) => Err(err),
+            },
+        }
+    }
+
     fn unpack_object(&mut self, packed_object: &Value) -> Result<Value, UnpackerError> {
         if packed_object.is_null() {
             return Ok(Value::Null);
@@ -142,10 +172,30 @@ impl Unpacker {
                 .collect();
         }
         if type_id == TYPE_STRING {
-            return packed_array[1..]
+            return match packed_array[1..]
                 .iter()
                 .map(|v| self.unpack_object(&v))
-                .collect();
+                .collect::<Result<Value, _>>()
+            {
+                Ok(arr) => {
+                    let vec = match arr.as_array() {
+                        Some(a) => a,
+                        None => {
+                            return Err(UnpackerError {
+                                cause: "expected array, got something else".to_owned(),
+                            })
+                        }
+                    };
+                    Ok(json!(vec.iter().fold("".to_owned(), |acc, x| {
+                        if acc.len() == 0 {
+                            x.as_str().unwrap().to_owned()
+                        } else {
+                            acc + "\n" + x.as_str().unwrap()
+                        }
+                    })))
+                }
+                Err(err) => return Err(err),
+            };
         }
         if type_id == TYPE_VALUE {
             return self.unpack_value(&packed_array[1]);
@@ -248,14 +298,13 @@ impl Unpacker {
             };
 
             let mut value = string;
-            if &string[0..1] == "~" {
+            if string.len() > 0 && &string[0..1] == "~" {
                 value = &string[1..];
             }
 
             self.add_to_dict(value);
             return Ok(json!(value));
         }
-
         Ok(json!(packed_object))
     }
 
@@ -267,6 +316,8 @@ impl Unpacker {
         }
     }
 
+    /// Set the maximum dictionary size. Must match the dictionary size used by the packer.
+    /// Default - 2000.
     pub fn set_max_dict_size(&mut self, value: u64) {
         self.max_dict_size = value;
     }

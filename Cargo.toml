@@ -7,6 +7,9 @@ license = "MIT"
 description = "jsonm implementation port for Rust."
 
 [dependencies]
-serde_json = "1.0"
 serde = "1.0.79"
 regex = "1"
+
+[dependencies.serde_json]
+version = "1.0"
+features = ["preserve_order"]

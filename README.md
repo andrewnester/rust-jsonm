@@ -9,9 +9,13 @@ Original library written in JS is here: https://github.com/lennartcl/jsonm
 ## Installation
 
     [dependencies]
-    "jsonm" = "0.1.0"
+    "jsonm" = "0.1"
 
 ## Examples
+    
+    #[macro_use]
+    extern crate serde_json;
+    extern crate jsonm;
     
     use jsonm::packer::{PackOptions, Packer};
     use jsonm::unpacker::Unpacker;

@@ -30,6 +30,7 @@ impl PackOptions {
     }
 }
 
+/// Packer used to pack/compress json-like structures.
 #[derive(Default, Debug)]
 pub struct Packer {
     dict: HashMap<u64, String>,
@@ -70,6 +71,7 @@ impl Packer {
         }
     }
 
+    /// Pack an JSON-like object.
     pub fn pack<T>(&mut self, object: &T, options: &PackOptions) -> Result<Value, PackerError>
     where
         T: Serialize,
@@ -101,6 +103,8 @@ impl Packer {
         }
     }
 
+    /// Pack a string. Efficiently packs multi-line strings and JSON strings.
+    /// When unpacked, a string is always returned again.
     pub fn pack_string(
         &mut self,
         string_to_pack: &str,
@@ -135,6 +139,7 @@ impl Packer {
             }
         }
     }
+    /// Reset the memoization dictionary, allowing consumption by new Unpacker instances.
     pub fn reset(&mut self) {
         self.dict = HashMap::new();
         self.dict_map = HashMap::new();
@@ -142,6 +147,8 @@ impl Packer {
         self.sequence_id = -1;
     }
 
+    /// Set the maximum dictionary size. Must match the dictionary size used by the unpacker.
+    /// Default - 2000
     pub fn set_max_dict_size(&mut self, value: u64) {
         self.max_dict_size = value;
     }
@@ -221,7 +228,7 @@ impl Packer {
                         string,
                         &PackOptions {
                             no_sequence_id: true,
-                            pack_string_depth: pack_string_depth,
+                            pack_string_depth: -1,
                         },
                     ) {
                         Ok(packed_string) => packed_string,
@@ -272,7 +279,7 @@ impl Packer {
         }
 
         self.add_to_dict(map_key, str_value);
-        if value.is_boolean() {
+        if value.is_boolean() || value.is_null() {
             return json!(value);
         }
         if value.is_string() {
@@ -287,7 +294,10 @@ impl Packer {
 
     fn add_to_dict(&mut self, map_key: &str, str_value: &str) {
         match self.dict.get(&self.dict_index) {
-            Some(delete_key) => self.dict_map.remove(delete_key),
+            Some(delete_key) => {
+                let key = self.get_map_key_from_str(delete_key);
+                self.dict_map.remove(&key)
+            }
             None => None,
         };
 
@@ -297,6 +307,14 @@ impl Packer {
 
         if self.dict_index >= (self.max_dict_size + MIN_DICT_INDEX) {
             self.dict_index = MIN_DICT_INDEX;
+        }
+    }
+
+    fn get_map_key_from_str(&self, key: &str) -> String {
+        let map_key_string = "~".to_owned() + key;
+        match key.parse::<u64>() {
+            Ok(_parsed) => key.to_owned(),
+            Err(_err) => map_key_string,
         }
     }
 }
