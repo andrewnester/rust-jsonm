@@ -1,6 +1,6 @@
 [package]
 name = "jsonm"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Andrew Nester <andrew.nester.dev@gmail.com>"]
 repository = "https://github.com/andrewnester/rust-jsonm"
 homepage = "https://github.com/andrewnester/rust-jsonm"
