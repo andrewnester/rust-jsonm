@@ -2,10 +2,9 @@ extern crate regex;
 extern crate serde;
 extern crate serde_json;
 
-use unpacker::regex::Regex;
-use unpacker::serde::de::Deserialize;
-use unpacker::serde_json::Value;
-
+use self::regex::Regex;
+use self::serde::Deserialize;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -275,7 +274,7 @@ impl Unpacker {
                 }
             };
 
-            let re = Regex::new(r"^\-?[0-9]*\.").unwrap();
+            let re = Regex::new(r"^-?[0-9]*\.").unwrap();
             if re.is_match(string) {
                 let _p: Value = match string.parse::<f64>() {
                     Ok(parse_number) => {
@@ -286,7 +285,7 @@ impl Unpacker {
                 };
             };
 
-            let re = Regex::new(r"^\-?[0-9]+").unwrap();
+            let re = Regex::new(r"^-?[0-9]+").unwrap();
             if re.is_match(string) {
                 let _p: Value = match string.parse::<i64>() {
                     Ok(parse_number) => {

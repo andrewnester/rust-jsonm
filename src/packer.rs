@@ -2,10 +2,9 @@ extern crate regex;
 extern crate serde;
 extern crate serde_json;
 
-use packer::regex::Regex;
-use packer::serde::ser::Serialize;
-use packer::serde_json::Value;
-
+use self::regex::Regex;
+use self::serde::Serialize;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -283,7 +282,7 @@ impl Packer {
             return json!(value);
         }
         if value.is_string() {
-            let re = Regex::new(r"^[0-9\.]|^~").unwrap();
+            let re = Regex::new(r"^[0-9.]|^~").unwrap();
             if re.is_match(str_value) {
                 return json!("~".to_owned() + str_value);
             }

@@ -11,7 +11,7 @@ use jsonm::unpacker::Unpacker;
 use serde_json::Value;
 
 #[test]
-fn it_packs_small_ints_as_string_values() {
+fn it_packs_small_integers_as_string_values() {
     let mut packer = Packer::new();
     let mut unpacker = Unpacker::new();
     let options = PackOptions::new();
@@ -22,7 +22,7 @@ fn it_packs_small_ints_as_string_values() {
 }
 
 #[test]
-fn it_packs_large_ints_as_string_values() {
+fn it_packs_large_integers_as_string_values() {
     let mut packer = Packer::new();
     let mut unpacker = Unpacker::new();
     let options = PackOptions::new();
