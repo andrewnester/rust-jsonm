@@ -15,6 +15,7 @@ const TYPE_ARRAY: u32 = 0;
 const TYPE_VALUE: u32 = 1;
 const TYPE_STRING: u32 = 2;
 
+#[derive(Default)]
 pub struct PackOptions {
     pub pack_string_depth: i32,
     pub no_sequence_id: bool,
@@ -134,7 +135,7 @@ impl Packer {
                 };
 
                 vec[0] = json!(TYPE_STRING);
-                return Ok(json!(vec));
+                Ok(json!(vec))
             }
         }
     }
@@ -245,7 +246,7 @@ impl Packer {
         Ok(json!(results))
     }
 
-    fn pack_array(&mut self, object: &Vec<Value>, pack_string_depth: i32) -> Value {
+    fn pack_array(&mut self, object: &[Value], pack_string_depth: i32) -> Value {
         let mut result: Vec<Value> = Vec::new();
         result.push(json!(TYPE_ARRAY));
         for val in object {

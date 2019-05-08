@@ -148,7 +148,8 @@ fn it_packs_multi_key_objects() {
         .pack(
             &json!( { "bar": 1, "baz": 2, "foo": { "qux": 3 } }),
             &options,
-        ).unwrap();
+        )
+        .unwrap();
     assert_eq!(
         packed,
         json!(["bar", "baz", "foo", "1", "2", ["qux", "3"], 0])
@@ -228,7 +229,8 @@ fn it_packs_multi_line_strings_as_normal_values() {
         .pack(
             &"hello there\nthis is\r\na multi-line string".to_owned(),
             &options,
-        ).unwrap();
+        )
+        .unwrap();
     assert_eq!(
         packed,
         json!([TYPE_VALUE, "hello there\nthis is\r\na multi-line string", 0])
@@ -247,7 +249,8 @@ fn it_packs_multi_line_strings_as_separate_values_in_string_packing_mode() {
         .pack_string(
             &"hello there\nthis is\r\na multi-line string".to_owned(),
             &options,
-        ).unwrap();
+        )
+        .unwrap();
     assert_eq!(
         packed,
         json!([
@@ -317,7 +320,8 @@ fn it_has_symmetrical_pack_string_and_unpack_string_for_strings() {
         .pack_string(
             &"hello there\nthis is\na multi-line string".to_owned(),
             &options,
-        ).unwrap();
+        )
+        .unwrap();
     assert_eq!(
         packed,
         json!([
@@ -384,7 +388,8 @@ fn it_has_no_issues_going_over_dictionary_size() {
             .pack(
                 &json!({"bar": 50, "baz": 60, "foo": i, "qux": i + 1}),
                 &options,
-            ).unwrap();
+            )
+            .unwrap();
         let unpacked: Value = unpacker.unpack(&packed).unwrap();
         assert_eq!(
             unpacked,
@@ -738,7 +743,8 @@ fn it_packs_with_null_and_true_and_false() {
         .pack(
             &json!({ "null": null, "true": true, "false": false }),
             &options,
-        ).unwrap();
+        )
+        .unwrap();
     assert_eq!(
         packed,
         json!(["null", "true", "false", null, true, false, 0])

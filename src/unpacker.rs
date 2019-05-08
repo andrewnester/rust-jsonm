@@ -186,7 +186,7 @@ impl Unpacker {
                         }
                     };
                     Ok(json!(vec.iter().fold("".to_owned(), |acc, x| {
-                        if acc.len() == 0 {
+                        if acc.is_empty() {
                             x.as_str().unwrap().to_owned()
                         } else {
                             acc + "\n" + x.as_str().unwrap()
@@ -296,10 +296,11 @@ impl Unpacker {
                 };
             };
 
-            let mut value = string;
-            if string.len() > 0 && &string[0..1] == "~" {
-                value = &string[1..];
-            }
+            let value = if !string.is_empty() && &string[0..1] == "~" {
+                &string[1..]
+            } else {
+                string
+            };
 
             self.add_to_dict(value);
             return Ok(json!(value));
