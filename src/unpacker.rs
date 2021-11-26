@@ -15,6 +15,7 @@ const MIN_DICT_INDEX: u64 = 3;
 const TYPE_ARRAY: i64 = 0;
 const TYPE_VALUE: i64 = 1;
 const TYPE_STRING: i64 = 2;
+const MAX_PACK_COMPLEX_OBJECT_SIZE: usize = 12;
 
 #[derive(Default, Debug)]
 pub struct Unpacker {
@@ -41,7 +42,7 @@ impl Error for UnpackerError {
         "Unpacker Error"
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         None
     }
 }
@@ -200,6 +201,7 @@ impl Unpacker {
             return self.unpack_value(&packed_array[1]);
         }
 
+        let mut contains_unmemoised = false;
         let mut processed_object: Vec<Value> = Vec::new();
         for item in packed_array {
             if item.is_object() || item.is_array() {
@@ -207,9 +209,12 @@ impl Unpacker {
                     Ok(v) => v,
                     Err(err) => return Err(err),
                 };
-
+                contains_unmemoised = true;
                 processed_object.push(value);
             } else {
+                if !item.is_number() {
+                    contains_unmemoised = true;
+                }
                 let value = match self.unpack_value(&item) {
                     Ok(v) => v,
                     Err(err) => return Err(err),
@@ -229,14 +234,24 @@ impl Unpacker {
             };
             result.insert(key, processed_object[i + key_count].clone());
         }
-        Ok(json!(result))
+
+        let json_result = json!(result);
+        if !contains_unmemoised && packed_array.len() <= MAX_PACK_COMPLEX_OBJECT_SIZE {
+            self.add_to_dict(&json_result.to_string());
+        }
+
+        Ok(json_result)
     }
 
     fn unpack_value(&mut self, packed_object: &Value) -> Result<Value, UnpackerError> {
         if packed_object.is_number() {
-            return match packed_object.as_u64() {
+            return match packed_object.as_i64() {
                 Some(v) => {
-                    let string = match self.dict.get(&v) {
+                    if v < 0 {
+                        return Ok(json!(v * -1));
+                    }
+                    let index = packed_object.as_u64().unwrap();
+                    let string = match self.dict.get(&index) {
                         Some(s) => s,
                         None => {
                             return Err(UnpackerError {
@@ -244,19 +259,12 @@ impl Unpacker {
                             })
                         }
                     };
-                    match string.parse::<i64>() {
-                        Ok(parse_number) => {
-                            return Ok(json!(parse_number));
-                        }
-                        Err(_err) => Value::Null,
+                    let json: serde_json::Value = match serde_json::from_str(&string) {
+                        Ok(parsed) => parsed,
+                        Err(_err) => json!(string),
                     };
-                    match string.parse::<f64>() {
-                        Ok(parse_number) => {
-                            return Ok(json!(parse_number));
-                        }
-                        Err(_err) => Value::Null,
-                    };
-                    Ok(json!(string))
+
+                    Ok(json)
                 }
                 None => Err(UnpackerError {
                     cause: "unknown".to_owned(),
@@ -274,7 +282,7 @@ impl Unpacker {
                 }
             };
 
-            let re = Regex::new(r"^-?[0-9]*\.").unwrap();
+            let re = Regex::new(r"^-?[0-9]+\.").unwrap();
             if re.is_match(string) {
                 let _p: Value = match string.parse::<f64>() {
                     Ok(parse_number) => {
@@ -285,7 +293,7 @@ impl Unpacker {
                 };
             };
 
-            let re = Regex::new(r"^-?[0-9]+").unwrap();
+            let re = Regex::new(r"^-?[0-9\.]").unwrap();
             if re.is_match(string) {
                 let _p: Value = match string.parse::<i64>() {
                     Ok(parse_number) => {
@@ -302,7 +310,7 @@ impl Unpacker {
                 string
             };
 
-            self.add_to_dict(value);
+            self.add_to_dict(&json!(value).to_string());
             return Ok(json!(value));
         }
         Ok(json!(packed_object))

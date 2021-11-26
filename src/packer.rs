@@ -14,11 +14,18 @@ const MIN_DICT_INDEX: u64 = 3;
 const TYPE_ARRAY: u32 = 0;
 const TYPE_VALUE: u32 = 1;
 const TYPE_STRING: u32 = 2;
+const MAX_PACK_COMPLEX_OBJECT_SIZE: usize = 12;
 
 #[derive(Default)]
 pub struct PackOptions {
     pub pack_string_depth: i32,
     pub no_sequence_id: bool,
+}
+
+#[derive(Default, Debug)]
+pub struct MemoObject {
+    pub key: String,
+    pub value: String,
 }
 
 impl PackOptions {
@@ -33,9 +40,10 @@ impl PackOptions {
 /// Packer used to pack/compress json-like structures.
 #[derive(Default, Debug)]
 pub struct Packer {
-    dict: HashMap<u64, String>,
-    dict_map: HashMap<String, u64>,
-    dict_index: u64,
+    memoised: HashMap<u64, MemoObject>,
+    memoised_map: HashMap<String, u64>,
+    memoised_object_map: HashMap<String, u64>,
+    memoised_index: u64,
     sequence_id: i64,
     max_dict_size: u64,
 }
@@ -56,7 +64,7 @@ impl Error for PackerError {
         "Packer Error"
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         None
     }
 }
@@ -66,7 +74,7 @@ impl Packer {
         Packer {
             sequence_id: -1,
             max_dict_size: 2000,
-            dict_index: MIN_DICT_INDEX,
+            memoised_index: MIN_DICT_INDEX,
             ..Default::default()
         }
     }
@@ -121,7 +129,7 @@ impl Packer {
                 }
 
                 let mut result = match self.pack(&json!(result_vec), options) {
-                    Ok(mut result) => result,
+                    Ok(result) => result,
                     Err(err) => return Err(err),
                 };
 
@@ -141,9 +149,10 @@ impl Packer {
     }
     /// Reset the memoization dictionary, allowing consumption by new Unpacker instances.
     pub fn reset(&mut self) {
-        self.dict = HashMap::new();
-        self.dict_map = HashMap::new();
-        self.dict_index = MIN_DICT_INDEX;
+        self.memoised = HashMap::new();
+        self.memoised_map = HashMap::new();
+        self.memoised_object_map = HashMap::new();
+        self.memoised_index = MIN_DICT_INDEX;
         self.sequence_id = -1;
     }
 
@@ -194,7 +203,14 @@ impl Packer {
             return Ok(self.pack_value(object));
         }
 
-        let mut results: Vec<Value> = Vec::new();
+        return self.pack_object(object, pack_string_depth);
+    }
+
+    fn pack_object(
+        &mut self,
+        object: &Value,
+        pack_string_depth: i32,
+    ) -> Result<Value, PackerError> {
         let obj = match object.as_object() {
             Some(obj) => obj,
             None => {
@@ -203,7 +219,7 @@ impl Packer {
                 })
             }
         };
-
+        let mut results: Vec<Value> = Vec::new();
         for (key, _value) in obj {
             results.push(self.pack_value(&json!(key)));
         }
@@ -243,7 +259,29 @@ impl Packer {
             }
         }
 
-        Ok(json!(results))
+        return Ok(self.try_pack_complex_object(object, results));
+    }
+
+    fn try_pack_complex_object(&mut self, object: &Value, results: Vec<Value>) -> Value {
+        if results.len() > MAX_PACK_COMPLEX_OBJECT_SIZE {
+            return json!(results);
+        }
+
+        for v in &results {
+            if !v.is_number() {
+                return json!(results);
+            }
+        }
+
+        let key = object.to_string();
+        if self.memoised_object_map.contains_key(&key) {
+            let val = self.memoised_object_map.get(&key);
+            return json!(val);
+        }
+
+        self.memoise(&object.to_string(), &key, true);
+
+        return json!(results);
     }
 
     fn pack_array(&mut self, object: &[Value], pack_string_depth: i32) -> Value {
@@ -273,16 +311,23 @@ impl Packer {
             str_value
         };
 
-        if self.dict_map.contains_key(map_key) {
-            let val = self.dict_map.get(map_key);
+        if self.memoised_map.contains_key(map_key) {
+            let val = self.memoised_map.get(map_key);
             return json!(val);
         }
 
-        self.add_to_dict(map_key, str_value);
         if value.is_boolean() || value.is_null() {
+            self.memoise(str_value, map_key, false);
             return json!(value);
         }
+
+        if value.is_number() {
+            self.memoise(str_value, map_key, false);
+            return json!(str_value);
+        }
+
         if value.is_string() {
+            self.memoise(str_value, map_key, false);
             let re = Regex::new(r"^[0-9.]|^~").unwrap();
             if re.is_match(str_value) {
                 return json!("~".to_owned() + str_value);
@@ -292,29 +337,35 @@ impl Packer {
         return json!(str_value);
     }
 
-    fn add_to_dict(&mut self, map_key: &str, str_value: &str) {
-        match self.dict.get(&self.dict_index) {
-            Some(delete_key) => {
-                let key = self.get_map_key_from_str(delete_key);
-                self.dict_map.remove(&key)
+    fn memoise(&mut self, str_value: &str, map_key: &str, is_object: bool) {
+        match self.memoised.get(&self.memoised_index) {
+            Some(found_object) => {
+                let key = &found_object.key;
+                self.memoised_map.remove(key);
+                self.memoised_object_map.remove(key);
             }
-            None => None,
-        };
-
-        self.dict_map.insert(map_key.to_owned(), self.dict_index);
-        self.dict.insert(self.dict_index, str_value.to_owned());
-        self.dict_index += 1;
-
-        if self.dict_index >= (self.max_dict_size + MIN_DICT_INDEX) {
-            self.dict_index = MIN_DICT_INDEX;
+            None => (),
         }
-    }
 
-    fn get_map_key_from_str(&self, key: &str) -> String {
-        let map_key_string = "~".to_owned() + key;
-        match key.parse::<u64>() {
-            Ok(_parsed) => key.to_owned(),
-            Err(_err) => map_key_string,
+        if is_object {
+            self.memoised_object_map
+                .insert(map_key.to_owned(), self.memoised_index);
+        } else {
+            self.memoised_map
+                .insert(map_key.to_owned(), self.memoised_index);
+        }
+
+        self.memoised.insert(
+            self.memoised_index,
+            MemoObject {
+                key: map_key.to_owned(),
+                value: str_value.to_owned(),
+            },
+        );
+        self.memoised_index += 1;
+
+        if self.memoised_index >= (self.max_dict_size + MIN_DICT_INDEX) {
+            self.memoised_index = MIN_DICT_INDEX;
         }
     }
 }
