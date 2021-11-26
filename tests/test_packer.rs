@@ -202,7 +202,7 @@ fn it_uses_memoization_the_second_time() {
     let packed = packer
         .pack(&json!({ "bar": 1, "foo": 2 }), &options)
         .unwrap();
-    assert_eq!(packed, json!([3, 4, 5, 6, 2]));
+    assert_eq!(packed, json!([1, 7, 2]));
     let unpacked: Value = unpacker.unpack(&packed).unwrap();
     assert_eq!(unpacked, json!({ "bar": 1, "foo": 2 }));
 }
@@ -346,33 +346,35 @@ fn it_has_no_issues_going_over_a_very_small_dictionary_size() {
     unpacker.set_max_dict_size(6);
 
     let options = PackOptions::new();
-    let packed = packer.pack(&[1, 2, 3, 4], &options).unwrap();
-    let unpacked: Vec<i32> = unpacker.unpack(&packed).unwrap();
-    assert_eq!(unpacked, [1, 2, 3, 4]);
+    let packed = packer.pack(&["1", "2", "3", "4"], &options).unwrap();
+    let unpacked: Vec<String> = unpacker.unpack(&packed).unwrap();
+    assert_eq!(unpacked, ["1", "2", "3", "4"]);
 
-    let packed = packer.pack(&[7, 8, 1, 2], &options).unwrap();
-    assert_eq!(packed, json!([TYPE_ARRAY, "7", "8", 3, 4, 1]));
-    let unpacked: Vec<i32> = unpacker.unpack(&packed).unwrap();
-    assert_eq!(unpacked, [7, 8, 1, 2]);
-
-    let packed = packer.pack(&[1, 2, 5, 6, 1, 5], &options).unwrap();
-    assert_eq!(packed, json!([TYPE_ARRAY, 3, 4, "5", "6", "1", 3, 2]));
-    let unpacked: Vec<i32> = unpacker.unpack(&packed).unwrap();
-    assert_eq!(unpacked, [1, 2, 5, 6, 1, 5]);
+    let packed = packer.pack(&["7", "8", "1", "2"], &options).unwrap();
+    assert_eq!(packed, json!([TYPE_ARRAY, "~7", "~8", 3, 4, 1]));
+    let unpacked: Vec<String> = unpacker.unpack(&packed).unwrap();
+    assert_eq!(unpacked, ["7", "8", "1", "2"]);
 
     let packed = packer
-        .pack(&json!({ "5": 11, "10": 5, "12": 13 }), &options)
+        .pack(&["1", "2", "5", "6", "1", "5"], &options)
         .unwrap();
-    assert_eq!(packed, json!(["~5", "~10", "~12", "11", "5", "13", 3]));
-    let unpacked: Value = unpacker.unpack(&packed).unwrap();
-    assert_eq!(unpacked, json!({ "5": 11, "10": 5, "12": 13 }));
+    assert_eq!(packed, json!([TYPE_ARRAY, 3, 4, "~5", "~6", "~1", 3, 2]));
+    let unpacked: Vec<Value> = unpacker.unpack(&packed).unwrap();
+    assert_eq!(unpacked, ["1", "2", "5", "6", "1", "5"]);
 
     let packed = packer
-        .pack(&json!({ "5": 11, "10": 5, "12": 14 }), &options)
+        .pack(&json!({ "5": "5", "10": "11", "12": "13" }), &options)
         .unwrap();
-    assert_eq!(packed, json!([6, 7, 8, 3, 4, "14", 4]));
+    assert_eq!(packed, json!([3, "~10", "~12", 3, "~11", "~13", 3]));
     let unpacked: Value = unpacker.unpack(&packed).unwrap();
-    assert_eq!(unpacked, json!({ "5": 11, "10": 5, "12": 14 }));
+    assert_eq!(unpacked, json!({ "5": "5", "10": "11", "12": "13"}));
+
+    let packed = packer
+        .pack(&json!({ "5": "5", "10": "11", "12": "14" }), &options)
+        .unwrap();
+    assert_eq!(packed, json!(["~5", 6, 7, 4, 8, "~14", 4]));
+    let unpacked: Value = unpacker.unpack(&packed).unwrap();
+    assert_eq!(unpacked, json!({ "5": "5", "10": "11", "12": "14" }));
 }
 
 #[test]
@@ -784,4 +786,31 @@ fn it_supports_reset() {
     let mut unpacker = Unpacker::new();
     let unpacked: Value = unpacker.unpack(&not_memoized).unwrap();
     assert_eq!(unpacked, json!({ "foo": "bar" }));
+}
+
+#[test]
+fn it_doesnot_pack_very_large_nonscalars() {
+    let mut packer = Packer::new();
+    let mut unpacker = Unpacker::new();
+    let large = json!({"a": 1, "b": 2, "c": 3, "d": 4, "e": 5, "f": 6, "g": 7});
+    let input = json!([large, large, large, {"x": 1}, {"x": 1}, {"x": 1}]);
+
+    let options = PackOptions::new();
+    let packed = packer.pack(&input, &options).unwrap();
+    assert_eq!(
+        packed,
+        json!([
+            0,
+            ["a", "b", "c", "d", "e", "f", "g", "1", "2", "3", "4", "5", "6", "7"],
+            [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+            [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+            ["x", 10],
+            [17, 10],
+            18,
+            0
+        ])
+    );
+
+    let unpacked: Value = unpacker.unpack(&packed).unwrap();
+    assert_eq!(unpacked, input);
 }
