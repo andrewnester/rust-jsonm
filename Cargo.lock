@@ -37,7 +37,7 @@ checksum = "5adb58558dcd1d786b5f0bd15f3226ee23486e24b7b58304b60f64dc68e62606"
 
 [[package]]
 name = "jsonm"
-version = "0.1.4"
+version = "0.2.0"
 dependencies = [
  "regex",
  "serde",
