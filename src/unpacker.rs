@@ -159,6 +159,13 @@ impl Unpacker {
             }
         };
 
+        // Handle empty packed array (empty object case)
+        if packed_array.is_empty() {
+            let empty_obj = json!({});
+            self.add_to_dict(&empty_obj.to_string());
+            return Ok(empty_obj);
+        }
+
         let type_value = &packed_array[0];
         let type_id = match type_value.as_i64() {
             Some(i) => i,
