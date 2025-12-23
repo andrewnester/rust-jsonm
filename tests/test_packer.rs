@@ -858,3 +858,58 @@ fn it_packs_empty_objects_nested() {
     let unpacked: Value = unpacker.unpack(&packed).unwrap();
     assert_eq!(unpacked, json!({"foo": {}}));
 }
+
+#[test]
+fn it_handles_null_values_with_memoization() {
+    // This test ensures that null values are properly memoized to maintain
+    // dictionary index sync between packer and unpacker
+    let mut packer = Packer::new();
+    let mut unpacker = Unpacker::new();
+
+    let options = PackOptions::new();
+    let input = json!({
+        "record1": {"name": "Alice", "tag": null},
+        "record2": {"name": "Bob", "tag": null},
+        "record3": {"name": "Charlie", "tag": null}
+    });
+
+    let packed = packer.pack(&input, &options).unwrap();
+    let unpacked: Value = unpacker.unpack(&packed).unwrap();
+
+    // Verify all null values are preserved correctly
+    assert_eq!(unpacked["record1"]["tag"], json!(null));
+    assert_eq!(unpacked["record2"]["tag"], json!(null));
+    assert_eq!(unpacked["record3"]["tag"], json!(null));
+
+    // Verify other values are correct
+    assert_eq!(unpacked["record1"]["name"], json!("Alice"));
+    assert_eq!(unpacked["record2"]["name"], json!("Bob"));
+    assert_eq!(unpacked["record3"]["name"], json!("Charlie"));
+}
+
+#[test]
+fn it_handles_boolean_values_with_memoization() {
+    // This test ensures that boolean values are properly memoized
+    let mut packer = Packer::new();
+    let mut unpacker = Unpacker::new();
+
+    let options = PackOptions::new();
+    let input = json!({
+        "a": {"flag": true, "value": 1},
+        "b": {"flag": false, "value": 2},
+        "c": {"flag": true, "value": 3}
+    });
+
+    let packed = packer.pack(&input, &options).unwrap();
+    let unpacked: Value = unpacker.unpack(&packed).unwrap();
+
+    // Verify all boolean values are preserved correctly
+    assert_eq!(unpacked["a"]["flag"], json!(true));
+    assert_eq!(unpacked["b"]["flag"], json!(false));
+    assert_eq!(unpacked["c"]["flag"], json!(true));
+
+    // Verify other values are correct
+    assert_eq!(unpacked["a"]["value"], json!(1));
+    assert_eq!(unpacked["b"]["value"], json!(2));
+    assert_eq!(unpacked["c"]["value"], json!(3));
+}
