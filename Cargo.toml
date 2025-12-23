@@ -16,7 +16,7 @@ categories = ["compression"]
 keywords = ["json", "jsonm", "compress"]
 
 [dependencies]
-serde = "1.0.79"
+serde = "1.0.228"
 regex = "1"
 
 [dependencies.serde_json]
