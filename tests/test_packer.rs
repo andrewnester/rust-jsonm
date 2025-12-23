@@ -814,3 +814,47 @@ fn it_doesnot_pack_very_large_nonscalars() {
     let unpacked: Value = unpacker.unpack(&packed).unwrap();
     assert_eq!(unpacked, input);
 }
+
+#[test]
+fn it_packs_empty_objects() {
+    // This test matches the exact bug report scenario
+    let mut packer = Packer::new();
+    let options = PackOptions::new();
+    let packed = packer.pack(&json!({}), &options).unwrap();
+
+    // The packed value should be [0]
+    assert_eq!(packed, json!([0]));
+
+    // This should not panic - it was panicking before the fix
+    let mut unpacker = Unpacker::new();
+    let unpacked: Result<Value, _> = unpacker.unpack(&packed);
+
+    // Verify unpacking succeeds and returns the original empty object
+    assert!(unpacked.is_ok());
+    assert_eq!(unpacked.unwrap(), json!({}));
+}
+
+#[test]
+fn it_packs_empty_objects_inside_arrays() {
+    let mut packer = Packer::new();
+    let mut unpacker = Unpacker::new();
+
+    let options = PackOptions::new();
+    let packed = packer.pack(&json!([{}, {}]), &options).unwrap();
+    // The second empty object is memoized and becomes index 3
+    assert_eq!(packed, json!([TYPE_ARRAY, [], 3, 0]));
+    let unpacked: Value = unpacker.unpack(&packed).unwrap();
+    assert_eq!(unpacked, json!([{}, {}]));
+}
+
+#[test]
+fn it_packs_empty_objects_nested() {
+    let mut packer = Packer::new();
+    let mut unpacker = Unpacker::new();
+
+    let options = PackOptions::new();
+    let packed = packer.pack(&json!({"foo": {}}), &options).unwrap();
+    assert_eq!(packed, json!(["foo", [], 0]));
+    let unpacked: Value = unpacker.unpack(&packed).unwrap();
+    assert_eq!(unpacked, json!({"foo": {}}));
+}
