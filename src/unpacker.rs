@@ -320,6 +320,12 @@ impl Unpacker {
             self.add_to_dict(&json!(value).to_string());
             return Ok(json!(value));
         }
+
+        // Handle null and boolean values - add them to dict to maintain sync with packer
+        if packed_object.is_null() || packed_object.is_boolean() {
+            self.add_to_dict(&packed_object.to_string());
+        }
+
         Ok(json!(packed_object))
     }
 
