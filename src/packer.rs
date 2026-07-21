@@ -20,6 +20,7 @@ const MAX_PACK_COMPLEX_OBJECT_SIZE: usize = 12;
 pub struct PackOptions {
     pub pack_string_depth: i32,
     pub no_sequence_id: bool,
+    pub memoize_objects: bool,
 }
 
 #[derive(Default, Debug)]
@@ -33,6 +34,7 @@ impl PackOptions {
         PackOptions {
             pack_string_depth: -1,
             no_sequence_id: false,
+            memoize_objects: true,
         }
     }
 }
@@ -46,6 +48,7 @@ pub struct Packer {
     memoised_index: u64,
     sequence_id: i64,
     max_dict_size: u64,
+    memoize_objects: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -75,6 +78,7 @@ impl Packer {
             sequence_id: -1,
             max_dict_size: 2000,
             memoised_index: MIN_DICT_INDEX,
+            memoize_objects: true,
             ..Default::default()
         }
     }
@@ -85,6 +89,7 @@ impl Packer {
         T: Serialize,
     {
         let json_object = json!(object);
+        self.memoize_objects = options.memoize_objects;
         let result = self.pack_object_or_value(&json_object, options.pack_string_depth);
         if options.no_sequence_id {
             return result;
@@ -195,6 +200,7 @@ impl Packer {
             let options = PackOptions {
                 no_sequence_id: true,
                 pack_string_depth: 0,
+                memoize_objects: self.memoize_objects,
             };
             return self.pack_string(obj_str, &options);
         }
@@ -245,6 +251,7 @@ impl Packer {
                         &PackOptions {
                             no_sequence_id: true,
                             pack_string_depth: -1,
+                            memoize_objects: self.memoize_objects,
                         },
                     ) {
                         Ok(packed_string) => packed_string,
@@ -263,6 +270,10 @@ impl Packer {
     }
 
     fn try_pack_complex_object(&mut self, object: &Value, results: Vec<Value>) -> Value {
+        if !self.memoize_objects {
+            return json!(results);
+        }
+
         if results.len() > MAX_PACK_COMPLEX_OBJECT_SIZE {
             return json!(results);
         }

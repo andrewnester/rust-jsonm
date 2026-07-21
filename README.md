@@ -65,4 +65,30 @@ Original library written in JS is here: https://github.com/lennartcl/jsonm
     
     let mut unpacker = Unpacker::new();
     let unpacked: Value = unpacker.unpack(&packed).unwrap(); // unpacked is Object({ "bar": 1, "foo": "1" })
-    
+
+## Interoperability with the JavaScript implementation
+
+By default this crate memoizes whole objects: when every key and value of an object is
+already in the dictionary, the object itself is added to the dictionary and later
+occurrences are packed as a single dictionary reference. The original JavaScript
+implementation does not memoize whole objects, so its dictionary index runs behind and
+messages containing repeated objects get corrupted when unpacked on the other side.
+
+To exchange messages with the JavaScript implementation, disable object memoization on
+both sides:
+
+```rust
+let mut packer = Packer::new();
+let mut options = PackOptions::new();
+options.memoize_objects = false;
+let packed = packer.pack(&json!([{"a": "x"}, {"a": "x"}]), &options).unwrap();
+
+let mut unpacker = Unpacker::new();
+unpacker.set_memoize_objects(false);
+let unpacked: Value = unpacker.unpack(&packed).unwrap();
+```
+
+With `memoize_objects` disabled the packed output is byte-compatible with the JavaScript
+`jsonm` library: its unpacker can consume messages packed by this crate, and messages
+packed by the JavaScript packer can be consumed by this crate's unpacker. The packer and
+unpacker must use the same setting, otherwise their dictionaries go out of sync.
