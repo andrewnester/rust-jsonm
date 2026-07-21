@@ -888,6 +888,78 @@ fn it_handles_null_values_with_memoization() {
 }
 
 #[test]
+fn it_memoizes_repeated_objects_by_default() {
+    let mut packer = Packer::new();
+    let mut unpacker = Unpacker::new();
+
+    let options = PackOptions::new();
+    let input = json!([{"a": "x"}, {"a": "x"}, {"a": "y"}, {"a": "y"}]);
+    let packed = packer.pack(&input, &options).unwrap();
+    assert_eq!(
+        packed,
+        json!([TYPE_ARRAY, ["a", "x"], [3, 4], [3, "y"], [3, 6], 0])
+    );
+    let unpacked: Value = unpacker.unpack(&packed).unwrap();
+    assert_eq!(unpacked, input);
+}
+
+#[test]
+fn it_matches_the_js_implementation_with_object_memoization_disabled() {
+    let mut packer = Packer::new();
+
+    let mut options = PackOptions::new();
+    options.memoize_objects = false;
+    let input = json!([{"a": "x"}, {"a": "x"}, {"a": "y"}, {"a": "y"}]);
+    let packed = packer.pack(&input, &options).unwrap();
+    assert_eq!(
+        packed,
+        json!([TYPE_ARRAY, ["a", "x"], [3, 4], [3, "y"], [3, 5], 0])
+    );
+}
+
+#[test]
+fn it_round_trips_with_object_memoization_disabled() {
+    let mut packer = Packer::new();
+    let mut unpacker = Unpacker::new();
+    unpacker.set_memoize_objects(false);
+
+    let mut options = PackOptions::new();
+    options.memoize_objects = false;
+    let input = json!([{"a": "x"}, {"a": "x"}, {"a": "y"}, {"a": "y"}]);
+    let packed = packer.pack(&input, &options).unwrap();
+    let unpacked: Value = unpacker.unpack(&packed).unwrap();
+    assert_eq!(unpacked, input);
+
+    let packed = packer.pack(&input, &options).unwrap();
+    let unpacked: Value = unpacker.unpack(&packed).unwrap();
+    assert_eq!(unpacked, input);
+}
+
+#[test]
+fn it_round_trips_many_repeated_objects_with_object_memoization_disabled() {
+    let mut packer = Packer::new();
+    let mut unpacker = Unpacker::new();
+    unpacker.set_memoize_objects(false);
+
+    let mut options = PackOptions::new();
+    options.memoize_objects = false;
+
+    let mut input = Vec::new();
+    for i in 0..300 {
+        input.push(json!({ "name": format!("name-{}", i % 10), "value": i % 7 }));
+    }
+    let input = json!(input);
+
+    let packed = packer.pack(&input, &options).unwrap();
+    let unpacked: Value = unpacker.unpack(&packed).unwrap();
+    assert_eq!(unpacked, input);
+
+    let packed = packer.pack(&input, &options).unwrap();
+    let unpacked: Value = unpacker.unpack(&packed).unwrap();
+    assert_eq!(unpacked, input);
+}
+
+#[test]
 fn it_handles_boolean_values_with_memoization() {
     // This test ensures that boolean values are properly memoized
     let mut packer = Packer::new();

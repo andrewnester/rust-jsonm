@@ -23,6 +23,7 @@ pub struct Unpacker {
     dict_index: u64,
     sequence_id: i64,
     max_dict_size: u64,
+    memoize_objects: bool,
     pending_unpacks: Vec<i32>,
 }
 
@@ -53,6 +54,7 @@ impl Unpacker {
             sequence_id: -1,
             max_dict_size: 2000,
             dict_index: MIN_DICT_INDEX,
+            memoize_objects: true,
             ..Default::default()
         }
     }
@@ -162,7 +164,9 @@ impl Unpacker {
         // Handle empty packed array (empty object case)
         if packed_array.is_empty() {
             let empty_obj = json!({});
-            self.add_to_dict(&empty_obj.to_string());
+            if self.memoize_objects {
+                self.add_to_dict(&empty_obj.to_string());
+            }
             return Ok(empty_obj);
         }
 
@@ -243,7 +247,10 @@ impl Unpacker {
         }
 
         let json_result = json!(result);
-        if !contains_unmemoised && packed_array.len() <= MAX_PACK_COMPLEX_OBJECT_SIZE {
+        if self.memoize_objects
+            && !contains_unmemoised
+            && packed_array.len() <= MAX_PACK_COMPLEX_OBJECT_SIZE
+        {
             self.add_to_dict(&json_result.to_string());
         }
 
@@ -341,5 +348,11 @@ impl Unpacker {
     /// Default - 2000.
     pub fn set_max_dict_size(&mut self, value: u64) {
         self.max_dict_size = value;
+    }
+
+    /// Set whether whole objects are memoized. Must match the `memoize_objects`
+    /// pack option used by the packer. Default - true.
+    pub fn set_memoize_objects(&mut self, value: bool) {
+        self.memoize_objects = value;
     }
 }
