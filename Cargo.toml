@@ -17,7 +17,6 @@ keywords = ["json", "jsonm", "compress"]
 
 [dependencies]
 serde = "1.0.228"
-regex = "1"
 
 [dependencies.serde_json]
 version = "1.0"

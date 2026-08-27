@@ -1,8 +1,6 @@
-extern crate regex;
 extern crate serde;
 extern crate serde_json;
 
-use self::regex::Regex;
 use self::serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -16,6 +14,17 @@ const TYPE_ARRAY: i64 = 0;
 const TYPE_VALUE: i64 = 1;
 const TYPE_STRING: i64 = 2;
 const MAX_PACK_COMPLEX_OBJECT_SIZE: usize = 12;
+
+fn starts_like_float(string: &str) -> bool {
+    let rest = string.strip_prefix('-').unwrap_or(string);
+    let after_digits = rest.trim_start_matches(|c: char| c.is_ascii_digit());
+    after_digits.len() < rest.len() && after_digits.starts_with('.')
+}
+
+fn starts_like_number(string: &str) -> bool {
+    let rest = string.strip_prefix('-').unwrap_or(string);
+    rest.starts_with(|c: char| c.is_ascii_digit() || c == '.')
+}
 
 #[derive(Default, Debug)]
 pub struct Unpacker {
@@ -296,8 +305,7 @@ impl Unpacker {
                 }
             };
 
-            let re = Regex::new(r"^-?[0-9]+\.").unwrap();
-            if re.is_match(string) {
+            if starts_like_float(string) {
                 let _p: Value = match string.parse::<f64>() {
                     Ok(parse_number) => {
                         self.add_to_dict(string);
@@ -307,8 +315,7 @@ impl Unpacker {
                 };
             };
 
-            let re = Regex::new(r"^-?[0-9\.]").unwrap();
-            if re.is_match(string) {
+            if starts_like_number(string) {
                 let _p: Value = match string.parse::<i64>() {
                     Ok(parse_number) => {
                         self.add_to_dict(string);
